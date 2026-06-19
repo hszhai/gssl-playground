@@ -1,6 +1,7 @@
 import { runShader, GSSL_SHADERS, over, grazingMask, fresnelRim, type GsslShader, type Vec3 } from '@hszhai/gssl';
 import { makeSphere, type Cloud } from './sphere.ts';
 import { GLRenderer } from './glraster.ts';
+import { rasterize } from './raster.ts';
 import { perspective, lookAt, orbitEye } from './m4.ts';
 import { SNIPPETS } from './snippets.ts';
 
@@ -13,7 +14,10 @@ const canvas = document.getElementById('view') as HTMLCanvasElement;
 const gl = canvas.getContext('webgl2', { antialias: true, premultipliedAlpha: false });
 if (!gl) throw new Error('WebGL2 not available');
 const renderer = new GLRenderer(gl);
+const cpuCanvas = document.getElementById('viewCpu') as HTMLCanvasElement;
+const cctx = cpuCanvas.getContext('2d')!;
 const hud = document.getElementById('hud')!;
+const rendererSel = document.getElementById('renderer') as HTMLSelectElement;
 const sel = document.getElementById('shader') as HTMLSelectElement;
 const lAz = document.getElementById('lightAz') as HTMLInputElement;
 const lEl = document.getElementById('lightEl') as HTMLInputElement;
@@ -26,6 +30,13 @@ const DISP = 600; // on-screen CSS size
 const dpr = Math.min(devicePixelRatio || 1, 2);
 canvas.style.width = DISP + 'px'; canvas.style.height = DISP + 'px';
 canvas.width = Math.round(DISP * dpr); canvas.height = Math.round(DISP * dpr);
+
+// CPU reference canvas: lower internal res (upscaled by CSS), since the CPU path
+// is fill-bound — it's the "look, same shaders, different renderer" demo.
+const CPU_RES = 340;
+cpuCanvas.style.width = DISP + 'px'; cpuCanvas.style.height = DISP + 'px';
+cpuCanvas.width = CPU_RES; cpuCanvas.height = CPU_RES;
+let mode: 'gl' | 'cpu' = 'gl';
 
 GSSL_SHADERS.forEach((s, i) => {
   const o = document.createElement('option');
@@ -68,10 +79,21 @@ function render() {
   const view = lookAt(eye, [0, 0, 0], [0, 1, 0]);
   const entry = GSSL_SHADERS[shaderIndex]!;
   const t0 = performance.now();
-  renderer.setShade(runShader(currentShade(), cloud.splats, cloud.prov, { eye, light: lightDir(), time: t0 * 0.001 }, cloud.restScale));
-  renderer.render(view, proj, canvas.width, canvas.height, bg);
+  // SAME shaders, SAME shade bus — only the renderer differs (GSSL is renderer-agnostic).
+  const bus = runShader(currentShade(), cloud.splats, cloud.prov, { eye, light: lightDir(), time: t0 * 0.001 }, cloud.restScale);
+  if (mode === 'gl') {
+    renderer.setShade(bus);
+    renderer.render(view, proj, canvas.width, canvas.height, bg);
+  } else {
+    const yup = rasterize(cloud.splats, view, proj, CPU_RES, CPU_RES, bg, bus);
+    const img = cctx.createImageData(CPU_RES, CPU_RES);
+    const row = CPU_RES * 4;
+    for (let y = 0; y < CPU_RES; y++) img.data.set(yup.subarray((CPU_RES - 1 - y) * row, (CPU_RES - y) * row), y * row);
+    cctx.putImageData(img, 0, 0);
+  }
   const ms = (performance.now() - t0).toFixed(1);
-  hud.textContent = `@hszhai/gssl · ${entry.name} · ${cloud.splats.length} splats (WebGL · ${ms}ms) — drag to orbit · wheel to zoom`;
+  const tag = mode === 'gl' ? 'WebGL' : `CPU @ ${CPU_RES}px`;
+  hud.textContent = `@hszhai/gssl · ${entry.name} · ${cloud.splats.length} splats (${tag} · ${ms}ms) — drag to orbit · wheel to zoom`;
 }
 
 function loop() { if (dirty) { dirty = false; render(); } requestAnimationFrame(loop); }
@@ -82,15 +104,24 @@ lAz.oninput = () => { dirty = true; };
 lEl.oninput = () => { dirty = true; };
 composeEl.onchange = () => { updateTeach(); dirty = true; };
 tauEl.oninput = () => { updateTeach(); dirty = true; };
+rendererSel.onchange = () => {
+  mode = rendererSel.value === 'cpu' ? 'cpu' : 'gl';
+  canvas.style.display = mode === 'gl' ? 'block' : 'none';
+  cpuCanvas.style.display = mode === 'cpu' ? 'block' : 'none';
+  dirty = true;
+};
 updateTeach();
 
+// Orbit controls bind to BOTH canvases (only one is visible per mode).
 let dragging = false, lx = 0, ly = 0;
-canvas.addEventListener('pointerdown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener('pointermove', (e) => {
+for (const cv of [canvas, cpuCanvas]) {
+  cv.addEventListener('pointerdown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.max(1.6, Math.min(8, dist * (1 + e.deltaY * 0.001))); dirty = true; }, { passive: false });
+}
+window.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   az -= (e.clientX - lx) * 0.01;
   el = Math.max(-1.5, Math.min(1.5, el + (e.clientY - ly) * 0.01));
   lx = e.clientX; ly = e.clientY; dirty = true;
 });
-canvas.addEventListener('pointerup', () => { dragging = false; });
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.max(1.6, Math.min(8, dist * (1 + e.deltaY * 0.001))); dirty = true; }, { passive: false });
+window.addEventListener('pointerup', () => { dragging = false; });

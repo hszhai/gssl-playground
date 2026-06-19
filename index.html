@@ -11,8 +11,9 @@
       h1 small { color: #9aa3b0; font-weight: 400; }
       #bar { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
       #stage { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-      #view { background: #000; border-radius: 8px; touch-action: none; cursor: grab; }
-      #view:active { cursor: grabbing; }
+      #view, #viewCpu { background: #000; border-radius: 8px; touch-action: none; cursor: grab; }
+      #view:active, #viewCpu:active { cursor: grabbing; }
+      #viewCpu { display: none; }
       select, input[type=range] { accent-color: #b3a07d; }
       label { display: inline-flex; gap: 6px; align-items: center; color: #9aa3b0; }
       #teach { flex: 1; min-width: 360px; display: flex; flex-direction: column; gap: 12px; }
@@ -32,12 +33,17 @@
 
       <div id="bar">
         <label>shader <select id="shader"></select></label>
+        <label>renderer <select id="renderer">
+          <option value="gl">WebGL</option>
+          <option value="cpu">CPU (reference)</option>
+        </select></label>
         <label>light az <input id="lightAz" type="range" min="-3.14" max="3.14" step="0.05" value="-1.0" /></label>
         <label>light el <input id="lightEl" type="range" min="-1.2" max="1.2" step="0.05" value="0.5" /></label>
       </div>
 
       <div id="stage">
         <canvas id="view"></canvas>
+        <canvas id="viewCpu"></canvas>
 
         <div id="teach">
           <div class="card">
