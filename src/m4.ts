@@ -44,3 +44,37 @@ export function orbitEye(az: number, el: number, dist: number, target: Vec3): Ve
   const ce = Math.cos(el);
   return [target[0] + dist * ce * Math.sin(az), target[1] + dist * Math.sin(el), target[2] + dist * ce * Math.cos(az)];
 }
+
+// ── EWA projection helpers (for the WebGL renderer) ──
+
+export function mat4TransformPoint(m: Mat4, p: Vec3): Vec3 {
+  const x = p[0], y = p[1], z = p[2];
+  const w = m[3]! * x + m[7]! * y + m[11]! * z + m[15]!;
+  if (Math.abs(w) < 1e-8) return [0, 0, 0];
+  return [
+    (m[0]! * x + m[4]! * y + m[8]! * z + m[12]!) / w,
+    (m[1]! * x + m[5]! * y + m[9]! * z + m[13]!) / w,
+    (m[2]! * x + m[6]! * y + m[10]! * z + m[14]!) / w,
+  ];
+}
+
+/** Inverse of a symmetric 2×2 [[a,b],[b,c]] as {x,y,z} = [[x,y],[y,z]]. */
+export function invertSym2D(a: number, b: number, c: number): { x: number; y: number; z: number } {
+  const det = a * c - b * b;
+  if (Math.abs(det) < 1e-8) return { x: 1, y: 0, z: 1 };
+  return { x: c / det, y: -b / det, z: a / det };
+}
+
+export interface Eigen2D { lambda1: number; lambda2: number; v1x: number; v1y: number; v2x: number; v2y: number; }
+
+/** Eigen-decomposition of a symmetric 2×2 — eigenvalues + orthonormal eigenvectors. */
+export function eigenDecompose2D(a: number, b: number, c: number): Eigen2D {
+  const trace = a + c;
+  const disc = Math.sqrt(Math.max(0, (a - c) * (a - c) + 4 * b * b));
+  const lambda1 = (trace + disc) * 0.5;
+  const lambda2 = (trace - disc) * 0.5;
+  let v1x: number, v1y: number;
+  if (Math.abs(b) < 1e-8) { v1x = 1; v1y = 0; }
+  else { v1x = lambda1 - c; v1y = b; const l = Math.sqrt(v1x * v1x + v1y * v1y) || 1; v1x /= l; v1y /= l; }
+  return { lambda1, lambda2, v1x, v1y, v2x: -v1y, v2y: v1x };
+}

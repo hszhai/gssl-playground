@@ -15,10 +15,13 @@ npm run dev       # open the playground
 ```
 
 - **`src/sphere.ts`** — a provenance-rich sphere (normal / uv / curvature / tangent).
-- **`src/raster.ts`** — a tiny CPU EWA splat rasterizer (the consumer's renderer);
+- **`src/glraster.ts`** — the app's **WebGL2** EWA splat renderer (the fast path);
   reads the shade bus via the package's exported lane constants.
-- **`src/main.ts`** — the app: shader dropdown, orbit, light sliders; CPU render
-  on demand.
+- **`src/raster.ts`** — a tiny **CPU** EWA rasterizer; used by the headless smoke
+  test (no GPU in Node) and as the readable reference for the same math.
+- **`src/snippets.ts`** — the GSSL source shown in the code panel.
+- **`src/main.ts`** — the app: shader dropdown, orbit, light sliders, the live
+  `over(…)` compose control, and the teaching panel.
 - **`npm run smoke`** — headless render of every gallery shader to `scripts/out/`,
   asserting the package is consumed and produces non-blank output.
 

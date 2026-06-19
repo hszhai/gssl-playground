@@ -1,6 +1,6 @@
 import { runShader, GSSL_SHADERS, over, grazingMask, fresnelRim, type GsslShader, type Vec3 } from '@hszhai/gssl';
 import { makeSphere, type Cloud } from './sphere.ts';
-import { rasterize } from './raster.ts';
+import { GLRenderer } from './glraster.ts';
 import { perspective, lookAt, orbitEye } from './m4.ts';
 import { SNIPPETS } from './snippets.ts';
 
@@ -10,7 +10,9 @@ import { SNIPPETS } from './snippets.ts';
 // to drag, crisp at rest. Render is on-demand (dirty flag), so it idles cheaply.
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d')!;
+const gl = canvas.getContext('webgl2', { antialias: true, premultipliedAlpha: false });
+if (!gl) throw new Error('WebGL2 not available');
+const renderer = new GLRenderer(gl);
 const hud = document.getElementById('hud')!;
 const sel = document.getElementById('shader') as HTMLSelectElement;
 const lAz = document.getElementById('lightAz') as HTMLInputElement;
@@ -20,15 +22,10 @@ const composeEl = document.getElementById('compose') as HTMLInputElement;
 const tauEl = document.getElementById('tau') as HTMLInputElement;
 const exprEl = document.getElementById('expr') as HTMLElement;
 
-const DISP = 512;       // on-screen size
-const FULL_RES = 384;   // render resolution when idle
-const DRAG_RES = 192;   // render resolution while interacting (¼ the pixels)
-canvas.width = DISP; canvas.height = DISP;
-ctx.imageSmoothingEnabled = true;
-
-// offscreen buffer the rasterizer writes into; scaled up to DISP on draw
-const buf = document.createElement('canvas');
-const bctx = buf.getContext('2d')!;
+const DISP = 600; // on-screen CSS size
+const dpr = Math.min(devicePixelRatio || 1, 2);
+canvas.style.width = DISP + 'px'; canvas.style.height = DISP + 'px';
+canvas.width = Math.round(DISP * dpr); canvas.height = Math.round(DISP * dpr);
 
 GSSL_SHADERS.forEach((s, i) => {
   const o = document.createElement('option');
@@ -38,9 +35,9 @@ GSSL_SHADERS.forEach((s, i) => {
 
 let shaderIndex = 0;
 let az = 0.7, el = 0.35, dist = 3.2;
-let cloud: Cloud = makeSphere(48, 96); // ~4.5k splats (discs auto-size to cover)
+let cloud: Cloud = makeSphere(80, 160); // ~12.6k splats — GPU handles it
+renderer.setSplats(cloud.splats);
 let dirty = true;
-let interacting = false;
 
 const bg: [number, number, number] = [0.58, 0.58, 0.62];
 const proj = perspective(Math.PI / 4, 1, 0.05, 50);
@@ -66,27 +63,21 @@ function updateTeach() {
     : 'off — rendering the base shader as written above';
 }
 
-function render(res: number) {
+function render() {
   const eye = orbitEye(az, el, dist, [0, 0, 0]);
   const view = lookAt(eye, [0, 0, 0], [0, 1, 0]);
   const entry = GSSL_SHADERS[shaderIndex]!;
   const t0 = performance.now();
-  const yup = rasterize(cloud.splats, view, proj, res, res, bg,
-    runShader(currentShade(), cloud.splats, cloud.prov, { eye, light: lightDir(), time: t0 * 0.001 }, cloud.restScale));
-  buf.width = res; buf.height = res;
-  const img = bctx.createImageData(res, res);
-  const row = res * 4;
-  for (let y = 0; y < res; y++) img.data.set(yup.subarray((res - 1 - y) * row, (res - y) * row), y * row); // y-up → top-down
-  bctx.putImageData(img, 0, 0);
-  ctx.drawImage(buf, 0, 0, res, res, 0, 0, DISP, DISP);
-  const ms = (performance.now() - t0).toFixed(0);
-  hud.textContent = `@hszhai/gssl · ${entry.name} · ${cloud.splats.length} splats @ ${res}px (${ms}ms) — drag to orbit · wheel to zoom`;
+  renderer.setShade(runShader(currentShade(), cloud.splats, cloud.prov, { eye, light: lightDir(), time: t0 * 0.001 }, cloud.restScale));
+  renderer.render(view, proj, canvas.width, canvas.height, bg);
+  const ms = (performance.now() - t0).toFixed(1);
+  hud.textContent = `@hszhai/gssl · ${entry.name} · ${cloud.splats.length} splats (WebGL · ${ms}ms) — drag to orbit · wheel to zoom`;
 }
 
-function loop() { if (dirty) { dirty = false; render(interacting ? DRAG_RES : FULL_RES); } requestAnimationFrame(loop); }
+function loop() { if (dirty) { dirty = false; render(); } requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 
-sel.onchange = () => { shaderIndex = +sel.value; cloud = makeSphere(48, 96); updateTeach(); dirty = true; }; // rebuild resets stroke rotations
+sel.onchange = () => { shaderIndex = +sel.value; cloud = makeSphere(80, 160); renderer.setSplats(cloud.splats); updateTeach(); dirty = true; }; // rebuild resets stroke rotations
 lAz.oninput = () => { dirty = true; };
 lEl.oninput = () => { dirty = true; };
 composeEl.onchange = () => { updateTeach(); dirty = true; };
@@ -94,19 +85,12 @@ tauEl.oninput = () => { updateTeach(); dirty = true; };
 updateTeach();
 
 let dragging = false, lx = 0, ly = 0;
-canvas.addEventListener('pointerdown', (e) => { dragging = true; interacting = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerdown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   az -= (e.clientX - lx) * 0.01;
   el = Math.max(-1.5, Math.min(1.5, el + (e.clientY - ly) * 0.01));
   lx = e.clientX; ly = e.clientY; dirty = true;
 });
-canvas.addEventListener('pointerup', () => { dragging = false; interacting = false; dirty = true; }); // final full-res pass
-let zoomTimer = 0;
-canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  dist = Math.max(1.6, Math.min(8, dist * (1 + e.deltaY * 0.001)));
-  interacting = true; dirty = true;
-  clearTimeout(zoomTimer);
-  zoomTimer = window.setTimeout(() => { interacting = false; dirty = true; }, 150); // crisp pass after the wheel settles
-}, { passive: false });
+canvas.addEventListener('pointerup', () => { dragging = false; });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.max(1.6, Math.min(8, dist * (1 + e.deltaY * 0.001))); dirty = true; }, { passive: false });
