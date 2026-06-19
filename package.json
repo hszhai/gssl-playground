@@ -1,9 +1,14 @@
 {
   "name": "gssl-playground",
-  "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Interactive playground for @hszhai/gssl — pick a Gaussian-splat shader and orbit a shaded sphere.",
+  "license": "MIT",
+  "author": "Sean Zhai (https://github.com/hszhai)",
+  "keywords": ["gssl", "gaussian-splatting", "3dgs", "shaders", "playground", "webgl"],
+  "homepage": "https://hszhai.github.io/gssl-playground/",
+  "repository": { "type": "git", "url": "git+https://github.com/hszhai/gssl-playground.git" },
+  "bugs": { "url": "https://github.com/hszhai/gssl-playground/issues" },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

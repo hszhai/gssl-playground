@@ -1,8 +1,10 @@
 # GSSL playground
 
+**▶ Live demo: https://hszhai.github.io/gssl-playground/**
+
 An interactive playground for [`@hszhai/gssl`](https://www.npmjs.com/package/@hszhai/gssl)
 — the Gaussian-Splat Shading Language. Pick a shader from the gallery, orbit a
-shaded sphere, and move the light.
+shaded sphere, move the light, and switch the renderer (WebGL / CPU reference).
 
 This repo is also the **reference consumer** of the package: it depends only on
 `@hszhai/gssl`'s public API (`runShader`, the shader gallery, the `Splat` /
