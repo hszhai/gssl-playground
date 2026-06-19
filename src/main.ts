@@ -1,7 +1,8 @@
-import { runShader, GSSL_SHADERS, type Vec3 } from '@hszhai/gssl';
+import { runShader, GSSL_SHADERS, over, grazingMask, fresnelRim, type GsslShader, type Vec3 } from '@hszhai/gssl';
 import { makeSphere, type Cloud } from './sphere.ts';
 import { rasterize } from './raster.ts';
 import { perspective, lookAt, orbitEye } from './m4.ts';
+import { SNIPPETS } from './snippets.ts';
 
 // The playground app: consume @hszhai/gssl to shade a sphere, orbit it, swap
 // shaders, move the light. The CPU rasterizer's cost is dominated by resolution,
@@ -14,6 +15,10 @@ const hud = document.getElementById('hud')!;
 const sel = document.getElementById('shader') as HTMLSelectElement;
 const lAz = document.getElementById('lightAz') as HTMLInputElement;
 const lEl = document.getElementById('lightEl') as HTMLInputElement;
+const codeEl = document.getElementById('code') as HTMLPreElement;
+const composeEl = document.getElementById('compose') as HTMLInputElement;
+const tauEl = document.getElementById('tau') as HTMLInputElement;
+const exprEl = document.getElementById('expr') as HTMLElement;
 
 const DISP = 512;       // on-screen size
 const FULL_RES = 384;   // render resolution when idle
@@ -45,13 +50,29 @@ function lightDir(): Vec3 {
   return [ce * Math.sin(a), Math.sin(e), ce * Math.cos(a)];
 }
 
+/** The active shader: the selected one, optionally wrapped in the `over` compose
+ *  demo — the one live "language param" that shows the operator + a footprint lane. */
+function currentShade(): GsslShader {
+  const base = GSSL_SHADERS[shaderIndex]!.shade;
+  return composeEl.checked ? over(base, fresnelRim, grazingMask(+tauEl.value)) : base;
+}
+
+/** Update the code panel + compose expression to match the current selection. */
+function updateTeach() {
+  const name = GSSL_SHADERS[shaderIndex]!.name;
+  codeEl.textContent = SNIPPETS[name] ?? '';
+  exprEl.textContent = composeEl.checked
+    ? `active: over(${name}, fresnelRim, grazingMask(${(+tauEl.value).toFixed(2)}))`
+    : 'off — rendering the base shader as written above';
+}
+
 function render(res: number) {
   const eye = orbitEye(az, el, dist, [0, 0, 0]);
   const view = lookAt(eye, [0, 0, 0], [0, 1, 0]);
   const entry = GSSL_SHADERS[shaderIndex]!;
   const t0 = performance.now();
   const yup = rasterize(cloud.splats, view, proj, res, res, bg,
-    runShader(entry.shade, cloud.splats, cloud.prov, { eye, light: lightDir(), time: t0 * 0.001 }, cloud.restScale));
+    runShader(currentShade(), cloud.splats, cloud.prov, { eye, light: lightDir(), time: t0 * 0.001 }, cloud.restScale));
   buf.width = res; buf.height = res;
   const img = bctx.createImageData(res, res);
   const row = res * 4;
@@ -65,9 +86,12 @@ function render(res: number) {
 function loop() { if (dirty) { dirty = false; render(interacting ? DRAG_RES : FULL_RES); } requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 
-sel.onchange = () => { shaderIndex = +sel.value; cloud = makeSphere(48, 96); dirty = true; }; // rebuild resets stroke rotations
+sel.onchange = () => { shaderIndex = +sel.value; cloud = makeSphere(48, 96); updateTeach(); dirty = true; }; // rebuild resets stroke rotations
 lAz.oninput = () => { dirty = true; };
 lEl.oninput = () => { dirty = true; };
+composeEl.onchange = () => { updateTeach(); dirty = true; };
+tauEl.oninput = () => { updateTeach(); dirty = true; };
+updateTeach();
 
 let dragging = false, lx = 0, ly = 0;
 canvas.addEventListener('pointerdown', (e) => { dragging = true; interacting = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });

@@ -5,25 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GSSL playground</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #0c0d11; color: #cdd3dc; font: 13px ui-monospace, monospace; }
-      #wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px; }
-      #bar { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; justify-content: center; }
+      html, body { margin: 0; min-height: 100%; background: #0c0d11; color: #cdd3dc; font: 13px ui-monospace, monospace; }
+      #wrap { display: flex; flex-direction: column; gap: 12px; padding: 18px; max-width: 1100px; margin: 0 auto; }
+      h1 { font-size: 16px; margin: 0; font-weight: 600; }
+      h1 small { color: #9aa3b0; font-weight: 400; }
+      #bar { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+      #stage { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
       #view { background: #000; border-radius: 8px; touch-action: none; cursor: grab; }
       #view:active { cursor: grabbing; }
       select, input[type=range] { accent-color: #b3a07d; }
       label { display: inline-flex; gap: 6px; align-items: center; color: #9aa3b0; }
+      #teach { flex: 1; min-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+      #teach .card { background: #15171d; border: 1px solid #23262e; border-radius: 8px; padding: 12px 14px; }
+      #teach h2 { font-size: 12px; margin: 0 0 8px; color: #b3a07d; text-transform: uppercase; letter-spacing: 0.06em; }
+      pre#code { margin: 0; white-space: pre-wrap; color: #d6dbe4; font-size: 12px; line-height: 1.5; }
+      .lanes b { color: #e0c98a; }
+      .compose { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      #expr { color: #8fd0ff; }
       #hud { color: #9aa3b0; }
       a { color: #b3a07d; }
     </style>
   </head>
   <body>
     <div id="wrap">
+      <h1>GSSL playground <small>— a Gaussian-splat shading language. pick a shader, orbit, compose.</small></h1>
+
       <div id="bar">
         <label>shader <select id="shader"></select></label>
         <label>light az <input id="lightAz" type="range" min="-3.14" max="3.14" step="0.05" value="-1.0" /></label>
         <label>light el <input id="lightEl" type="range" min="-1.2" max="1.2" step="0.05" value="0.5" /></label>
       </div>
-      <canvas id="view"></canvas>
+
+      <div id="stage">
+        <canvas id="view"></canvas>
+
+        <div id="teach">
+          <div class="card">
+            <h2>a shader is one pure function</h2>
+            <pre id="code"></pre>
+          </div>
+
+          <div class="card lanes">
+            <h2>what it returns</h2>
+            <div><b>color, opacity</b> — the colour path (like any shader)</div>
+            <div><b>flatness, kernel, aniso, stroke</b> — the splat-native FOOTPRINT:
+              the shape of the primitive itself. A screen-space pixel shader has no
+              analogue for these.</div>
+          </div>
+
+          <div class="card">
+            <h2>compose — the operator that makes it a language</h2>
+            <div class="compose">
+              <label><input id="compose" type="checkbox" /> over(base, fresnelRim, grazingMask(τ))</label>
+              <label>τ <input id="tau" type="range" min="0.1" max="0.9" step="0.02" value="0.5" /></label>
+            </div>
+            <div id="expr" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="hud">loading…</div>
       <div>powered by <a href="https://www.npmjs.com/package/@hszhai/gssl">@hszhai/gssl</a></div>
     </div>
