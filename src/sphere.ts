@@ -14,7 +14,7 @@ export function makeSphere(latBands = 70, lonBands = 140, radius = 1): Cloud {
   const splats: Splat[] = [];
   const prov: SplatProvenance[] = [];
   const restScale: Vec3[] = [];
-  const s = radius * (Math.PI / latBands) * 1.05; // disc radius ≈ row spacing
+  const s = radius * (Math.PI / latBands) * 0.9; // disc radius ≈ row spacing (tight = less overdraw)
   const thin = s * 0.3;
 
   for (let i = 1; i < latBands; i++) {
