@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GSSL playground</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0c0d11; color: #cdd3dc; font: 13px ui-monospace, monospace; }
+      #wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px; }
+      #bar { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; justify-content: center; }
+      #view { background: #000; border-radius: 8px; touch-action: none; cursor: grab; }
+      #view:active { cursor: grabbing; }
+      select, input[type=range] { accent-color: #b3a07d; }
+      label { display: inline-flex; gap: 6px; align-items: center; color: #9aa3b0; }
+      #hud { color: #9aa3b0; }
+      a { color: #b3a07d; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <div id="bar">
+        <label>shader <select id="shader"></select></label>
+        <label>light az <input id="lightAz" type="range" min="-3.14" max="3.14" step="0.05" value="-1.0" /></label>
+        <label>light el <input id="lightEl" type="range" min="-1.2" max="1.2" step="0.05" value="0.5" /></label>
+      </div>
+      <canvas id="view"></canvas>
+      <div id="hud">loading…</div>
+      <div>powered by <a href="https://www.npmjs.com/package/@hszhai/gssl">@hszhai/gssl</a></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+# GSSL playground
+
+An interactive playground for [`@hszhai/gssl`](https://www.npmjs.com/package/@hszhai/gssl)
+— the Gaussian-Splat Shading Language. Pick a shader from the gallery, orbit a
+shaded sphere, and move the light.
+
+This repo is also the **reference consumer** of the package: it depends only on
+`@hszhai/gssl`'s public API (`runShader`, the shader gallery, the `Splat` /
+`SplatProvenance` types, and the `SHADE_*` / `KERNEL_*` constants for reading the
+shade bus) and brings **its own** renderer — proving GSSL is renderer-agnostic.
+
+```
+npm install      # pulls @hszhai/gssl from npm
+npm run dev       # open the playground
+```
+
+- **`src/sphere.ts`** — a provenance-rich sphere (normal / uv / curvature / tangent).
+- **`src/raster.ts`** — a tiny CPU EWA splat rasterizer (the consumer's renderer);
+  reads the shade bus via the package's exported lane constants.
+- **`src/main.ts`** — the app: shader dropdown, orbit, light sliders; CPU render
+  on demand.
+- **`npm run smoke`** — headless render of every gallery shader to `scripts/out/`,
+  asserting the package is consumed and produces non-blank output.
+
+## How it consumes GSSL
+
+```ts
+import { runShader, GSSL_SHADERS } from '@hszhai/gssl';
+
+const bus = runShader(GSSL_SHADERS[i].shade, splats, provenance, { eye, light, time }, restScale);
+// runShader writes color/opacity/footprint into `splats` and returns the shade
+// bus (flatness + kernel per splat) — hand both to your renderer.
+```
